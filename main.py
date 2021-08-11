@@ -1,4 +1,5 @@
 from constants import Tile_Size
+from lookup_tables import generate_lookup_tables
 from game_classes import Board
 import pygame
 
@@ -9,7 +10,9 @@ screen = pygame.display.set_mode([Tile_Size * 8, Tile_Size * 8])
 
 clock = pygame.time.Clock()
 
-board = Board(False)
+lookup_tables = generate_lookup_tables()
+
+board = Board(lookup_tables, False)
 
 # Main game loop
 running = True
@@ -26,7 +29,7 @@ while running:
         elif event.type == pygame.MOUSEBUTTONDOWN:
             clicked = True
 
-    board.update(clicked, dt)
+    board.update(clicked, dt, lookup_tables)
     board.draw(screen)
 
     pygame.display.flip()

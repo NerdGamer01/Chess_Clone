@@ -1,42 +1,11 @@
+from lookup_tables import print_bb
 import numpy as np
 
-# Creates arrays of bitborards where each bit board has a file/rank filled with ones
-ranks = np.flip(np.array([np.uint64(0x00000000000000FF) << np.uint8(8 * i) for i in range(8)], dtype=np.uint64))
-files = np.array([np.uint64(0x0101010101010101) << np.uint8(i) for i in range(8)], dtype=np.uint64)
+A1H8_diag = np.uint64(0x8040201008040201)
+H1A8_antidiag = np.uint64(0x0102040810204080)
 
 
-# Prints a bitboard as a 8x8 board
-def print_bb(bb):
-    bb = '{0:064b}'.format(bb)
-    for i in range(8):
-        row = ''
-        for j in bb[i * 8:(i * 8 + 8)]:
-            row += ' ' + j
-        print(row)
-    print(' ')
-
-
-# Shifts a bitboard by one in a given direction
-def shift_bb(bb, d):
-    if d == 'ne':
-        return (bb & ~files[0]) << np.uint8(7)
-    elif d == 'n':
-        return bb << np.uint8(8)
-    elif d == 'nw':
-        return (bb & ~files[7]) << np.uint8(9)
-    elif d == 'w':
-        return (bb & ~files[7]) << np.uint8(1)
-    elif d == 'sw':
-        return (bb & ~files[7]) >> np.uint8(7)
-    elif d == 's':
-        return bb >> np.uint8(8)
-    elif d == 'se':
-        return (bb & ~files[0]) >> np.uint8(9)
-    elif d == 'e':
-        return (bb & ~files[0]) >> np.uint8(1)
-
-
-def generate_legal_moves(tiles, turn):
+def generate_legal_moves(tiles, turn, lookup_tables):
     white_pieces = []
     black_pieces = []
 
@@ -72,39 +41,36 @@ def generate_legal_moves(tiles, turn):
         piece.update_bb()
         enemy_pieces_bb = enemy_pieces_bb | piece.bb
 
+    occupied_tiles_bb = enemy_pieces_bb | friendly_pieces_bb
+
     # Creates bitboard of all tiles attacked by the enemy ingorning the friendly king
     # These are then the tiles the king can't move to or it would be in check
     king_danger_tiles = np.uint64(0)
 
     for piece in enemy_pieces:
         if piece.type == 'Pawn':
-            if piece.color == 'White':
-                king_danger_tiles = king_danger_tiles | shift_bb(piece.bb, 'n')
-                if piece.tile[1] == 6:
-                    king_danger_tiles = king_danger_tiles | shift_bb(shift_bb(piece.bb, 'n'), 'n')
-            else:
-                king_danger_tiles = king_danger_tiles | shift_bb(piece.bb, 's')
-                if piece.tile[1] == 1:
-                    king_danger_tiles = king_danger_tiles | shift_bb(shift_bb(piece.bb, 's'), 's')
+            king_danger_tiles = king_danger_tiles | lookup_tables[piece.color + '_' + piece.type + '_Attacks'][piece.bb_pos_index()]
 
-        elif piece.type == 'King':
-            for d in ('n', 's', 'e', 'w', 'ne', 'nw', 'sw', 'se'):
-                king_danger_tiles = king_danger_tiles | shift_bb(piece.bb, d)
+        elif piece.type == 'King' or piece.type == 'Knight':
+            king_danger_tiles = king_danger_tiles | lookup_tables[piece.type + '_Moves'][piece.bb_pos_index()]
 
-        elif piece.type == 'Knight':
-            for d in ('ne', 'se', 'nw', 'se'):
-                bb = shift_bb(piece.bb, d)
-                king_danger_tiles = king_danger_tiles | shift_bb(bb, d[0]) | shift_bb(bb, d[1])
+
 
     # Finds legal moves
     for piece in friendly_pieces:
-        moves = np.uint(0)
+        moves = np.uint64(0)
 
         if piece.type == 'King':
-            for d in ('n', 's', 'e', 'w', 'ne', 'nw', 'sw', 'se'):
-                moves = moves | shift_bb(piece.bb, d)
-            moves = moves & ~(king_danger_tiles | friendly_pieces_bb)
+            moves = lookup_tables['King_Moves'][piece.bb_pos_index()]
+            moves = moves & (~king_danger_tiles) & (~friendly_pieces_bb)
 
             piece.update_legal_moves(moves)
+
+        elif piece.type == 'Knight':
+            moves = lookup_tables['Knight_Moves'][piece.bb_pos_index()] & (~friendly_pieces_bb)
+            piece.update_legal_moves(moves)
+
+
+
 
     print_bb(king_danger_tiles)

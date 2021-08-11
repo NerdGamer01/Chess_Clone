@@ -3,7 +3,6 @@ from engine import generate_legal_moves
 import numpy as np
 import pygame
 
-
 # Creates background
 background = pygame.Surface((Tile_Size * 8, Tile_Size * 8))
 background.fill((255, 255, 255))
@@ -31,7 +30,7 @@ selected_indicator.set_alpha(100)
 
 
 class Board:
-    def __init__(self, AI, save_file=None):
+    def __init__(self, lookup_tables, AI, save_file=None):
         self.turn = 'White' # Which turn it is
         self.selected_piece = None # The piece currently selected by the player
         self.AI = AI # Is this a round with or without ai
@@ -64,14 +63,14 @@ class Board:
                 self.sprites.add(self.tiles[(x, 7)])
                 self.sprites.add(self.tiles[(x, 6)])
 
-        generate_legal_moves(self.tiles, self.turn)
+        generate_legal_moves(self.tiles, self.turn, lookup_tables)
 
-    def update(self,clicked, dt):
+    def update(self,clicked, dt, lookup_tables):
         if clicked and not self.moving_piece:
             self.select_piece()
 
         elif self.moving_piece:
-            self.update_move(dt)
+            self.update_move(dt, lookup_tables)
 
     def select_piece(self):
         # Process the player clicking on the board and select/deselects pieces
@@ -90,7 +89,7 @@ class Board:
             else:
                 self.selected_piece = None
 
-    def update_move(self, dt):
+    def update_move(self, dt, lookup_tables):
         # Updates movement animation and when done updates the tiles with the boards new configuration
         self.selected_piece.move(self.target, dt)
 
@@ -111,7 +110,7 @@ class Board:
             else:
                 self.turn = 'White'
 
-            generate_legal_moves(self.tiles, self.turn)
+            generate_legal_moves(self.tiles, self.turn, lookup_tables)
 
     def draw(self, screen):
         # Draws Background
@@ -169,7 +168,7 @@ class Piece(pygame.sprite.Sprite):
         self.rect.y = self.rect.y + ((direction_y * speed * dt) / modulus)
 
     def completed_movement(self, target):
-        error = 0.05
+        error = 0.06
 
         if (target[0] - Tile_Size * error <= self.rect.x and target[0] + Tile_Size * error >= self.rect.x) and (target[1] - Tile_Size * error <= self.rect.y and target[1] + Tile_Size * error >= self.rect.y):
             self.rect.x = target[0]
@@ -181,9 +180,13 @@ class Piece(pygame.sprite.Sprite):
 
     def update_bb(self):
         bb = ['0'] * 64
-        bb[self.tile[1] * 8 + self.tile[0]] = '1'
+        bb[self.bb_pos_index()] = '1'
         bb = ''.join(bb)
         self.bb = np.uint64(int(bb,2))
+
+    # Return index for pieces position on a bitboard
+    def bb_pos_index(self):
+        return self.tile[1] * 8 + self.tile[0]
 
     def update_legal_moves(self,bb):
         bb = '{0:064b}'.format(bb)
