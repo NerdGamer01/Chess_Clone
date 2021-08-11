@@ -90,7 +90,7 @@ class Board:
                 self.selected_piece = None
 
     def update_move(self, dt, lookup_tables):
-        # Updates movement animation and when done updates the tiles with the boards new configuration
+        # Updates movement animation and when done updates the tiles with the boards new configuration and ends turn
         self.selected_piece.move(self.target, dt)
 
         if self.selected_piece.completed_movement(self.target):

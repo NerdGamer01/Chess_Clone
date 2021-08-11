@@ -1,8 +1,6 @@
+from constants import files, ranks
 import numpy as np
 
-# Creates arrays of bitborards where each bit board has a file/rank filled with ones
-ranks = np.flip(np.array([np.uint64(0x00000000000000FF) << np.uint8(8 * i) for i in range(8)], dtype=np.uint64))
-files = np.flip(np.array([np.uint64(0x0101010101010101) << np.uint8(i) for i in range(8)], dtype=np.uint64))
 
 # Shifts a bitboard by one in a given direction
 def shift_bb(bb, d):
@@ -23,6 +21,7 @@ def shift_bb(bb, d):
     elif d == 'e':
         return (bb & ~files[7]) >> np.uint8(1)
 
+
 # Prints a bitboard as a 8x8 board
 def print_bb(bb):
     bb = '{0:064b}'.format(bb)
@@ -33,11 +32,13 @@ def print_bb(bb):
         print(row)
     print(' ')
 
+
 # Return bitboard with first bit being one and the rest being zero
 def bb_first():
     pos = ['0'] * 64
     pos[0] = '1'
     return np.uint64(int(''.join(pos), 2))
+
 
 # Generates the attack bitboards for every piece for every possible location
 def generate_lookup_tables():
@@ -66,47 +67,12 @@ def generate_lookup_tables():
         pos = pos >> np.uint8(1)
         lookup_tables['Knight_Moves'][i] = bb
 
-    # Generates rook blocker masks
-    lookup_tables['Rook_Blocker_Masks'] = np.zeros(64, dtype=np.uint64)
-    for y in range(8):
-        for x in range(8):
-            lookup_tables['Rook_Blocker_Masks'][y * 8 + x] = ranks[y] ^ files[x]
-
-    # Generates bishop blocker masks
-    lookup_tables['Bishop_Blocker_Masks'] = np.zeros(64, dtype=np.uint64)
-    diagonal = np.uint64(0x8040201008040201)
-    diag_mask = np.zeros(15, dtype=np.uint64)
-
-    for i in range(8):
-        diag_mask[i] = diagonal
-        diagonal = shift_bb(diagonal, 'e')
-
-    diagonal = np.uint64(0x8040201008040201)
-    for i in range(7):
-        diagonal = shift_bb(diagonal, 'w')
-        diag_mask[14 - i] = diagonal
-
-    anti_diag_mask = np.zeros(15, dtype=np.uint64)
-    anti_diagonal = np.uint64(0x0102040810204080)
-    for i in range(8):
-        anti_diag_mask[7 - i] =  anti_diagonal
-        anti_diagonal = shift_bb(anti_diagonal, 'w')
-
-    anti_diagonal = np.uint64(0x0102040810204080)
-    for i in range(7):
-        anti_diagonal = shift_bb(anti_diagonal, 'e')
-        anti_diag_mask[8 + i] = anti_diagonal
-
-    for y in range(8):
-        for x in range(8):
-            lookup_tables['Bishop_Blocker_Masks'][y * 8 + x] = diag_mask[x - y] ^ anti_diag_mask[x + y]
-
     # Generates white pawn attack moves
     lookup_tables['White_Pawn_Attacks'] = np.zeros(64, dtype=np.uint64)
     pos = bb_first()
 
     for i in range(64):
-        lookup_tables['White_Pawn_Attacks'][i] = shift_bb(pos,'ne') | shift_bb(pos, 'nw')
+        lookup_tables['White_Pawn_Attacks'][i] = shift_bb(pos, 'ne') | shift_bb(pos, 'nw')
         pos = pos >> np.uint8(1)
 
     # Generates black pawn attack moves
@@ -117,9 +83,37 @@ def generate_lookup_tables():
         lookup_tables['Black_Pawn_Attacks'][i] = shift_bb(pos, 'se') | shift_bb(pos, 'sw')
         pos = pos >> np.uint8(1)
 
+    # Generates bottom rank moves for kindergarten approach for sliding pieces
+    lookup_tables['Bottom_Rank_Moves'] = np.zeros((8, 256), dtype=np.uint64)
+    empty = np.uint8(0)
+    one = np.uint8(1)
 
-    for i in anti_diag_mask:
-        print_bb(i)
+    for occupied in range(256):
+        for i in range(8):
+            occupied = np.uint8(occupied)
+            i = np.uint8(i)
+            x = one << np.uint8(7) - i
+            if (x & occupied) == empty:
+                continue
 
+            left_attack = x
+            left_move = empty
+
+            while left_attack != empty:
+                left_attack = left_attack << one
+                left_move = left_attack | left_move
+                if (left_attack & occupied) != empty:
+                    break
+
+            right_attack = x
+            right_move = empty
+
+            while right_attack != empty:
+                right_attack = right_attack >> one
+                right_move = right_move | right_attack
+                if (right_attack & occupied) != empty:
+                    break
+
+            lookup_tables['Bottom_Rank_Moves'][i][occupied] = left_move | right_move
 
     return lookup_tables
