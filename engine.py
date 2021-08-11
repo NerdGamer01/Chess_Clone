@@ -1,10 +1,6 @@
 from lookup_tables import print_bb
 import numpy as np
 
-A1H8_diag = np.uint64(0x8040201008040201)
-H1A8_antidiag = np.uint64(0x0102040810204080)
-
-
 def generate_legal_moves(tiles, turn, lookup_tables):
     white_pieces = []
     black_pieces = []
@@ -69,8 +65,5 @@ def generate_legal_moves(tiles, turn, lookup_tables):
         elif piece.type == 'Knight':
             moves = lookup_tables['Knight_Moves'][piece.bb_pos_index()] & (~friendly_pieces_bb)
             piece.update_legal_moves(moves)
-
-
-
 
     print_bb(king_danger_tiles)
