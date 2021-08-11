@@ -10,7 +10,7 @@ screen = pygame.display.set_mode([Tile_Size * 8, Tile_Size * 8])
 
 clock = pygame.time.Clock()
 
-# Generates lookup tables for the piece movments once when the game is launched
+# Generates lookup tables for the piece movements once when the game is launched
 lookup_tables = generate_lookup_tables()
 
 board = Board(lookup_tables, False)
@@ -30,7 +30,7 @@ while running:
         elif event.type == pygame.MOUSEBUTTONDOWN:
             clicked = True
 
-    board.update(clicked, dt, lookup_tables)
+    board.update(clicked, dt)
     board.draw(screen)
 
     pygame.display.flip()
