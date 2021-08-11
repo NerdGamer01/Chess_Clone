@@ -83,6 +83,26 @@ def generate_lookup_tables():
         lookup_tables['Black_Pawn_Attacks'][i] = shift_bb(pos, 'se') | shift_bb(pos, 'sw')
         pos = pos >> np.uint8(1)
 
+    # Generates white pawn moves
+    lookup_tables['White_Pawn_Moves'] = np.zeros(64, dtype=np.uint64)
+    pos = bb_first()
+
+    for i in range(64):
+        lookup_tables['White_Pawn_Moves'][i] = shift_bb(pos, 'n')
+        if i > 47 and i < 56:
+            lookup_tables['White_Pawn_Moves'][i] = lookup_tables['White_Pawn_Moves'][i] | shift_bb(lookup_tables['White_Pawn_Moves'][i], 'n')
+        pos = pos >> np.uint8(1)
+
+    # Generates black pawn moves
+    lookup_tables['Black_Pawn_Moves'] = np.zeros(64, dtype=np.uint64)
+    pos = bb_first()
+
+    for i in range(64):
+        lookup_tables['Black_Pawn_Moves'][i] = shift_bb(pos, 'n')
+        if i > 7 and i < 16:
+            lookup_tables['Black_Pawn_Moves'][i] = lookup_tables['Black_Pawn_Moves'][i] | shift_bb(lookup_tables['Black_Pawn_Moves'][i], 'n')
+        pos = pos >> np.uint8(1)
+
     # Generates bottom rank moves for kindergarten approach for sliding pieces
     lookup_tables['Bottom_Rank_Moves'] = np.zeros((8, 256), dtype=np.uint64)
     empty = np.uint8(0)
