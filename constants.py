@@ -9,5 +9,5 @@ ranks = np.flip(np.array([np.uint64(0x00000000000000FF) << np.uint8(8 * i) for i
 files = np.flip(np.array([np.uint64(0x0101010101010101) << np.uint8(i) for i in range(8)], dtype=np.uint64))
 
 # Bitboards with the diagonal and anti-diagonal lines filled
-anti_diagonal = np.uint64(0x0102040810204080)
+anti_diagonal = np.uint64(0x8040201008040201)
 diagonal = np.uint64(0x0102040810204080)

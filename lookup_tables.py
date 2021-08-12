@@ -1,7 +1,6 @@
 from bitboard_functions import shift_bb
 import numpy as np
 
-
 # Return bitboard with first bit being one and the rest being zero
 def bb_first():
     pos = ['0'] * 64
