@@ -1,5 +1,5 @@
 from constants import Tile_Size, Origin, Tile_Color
-from engine import generate_legal_moves
+from move_gen import generate_legal_moves
 import numpy as np
 import pygame
 
@@ -35,7 +35,7 @@ class Board:
         self.selected_piece = None # The piece currently selected by the player
         self.AI = AI # Is this a round with or without ai
         self.moving_piece = False # Is a piece currently moving
-        self.tiles = {} # A dictonary containing all the pieces with the tile coordinate as the key
+        self.tiles = {} # A dictionary containing all the pieces with the tile coordinate as the key
         self.sprites = pygame.sprite.Group()
         self.lookup_tables = lookup_tables
 
@@ -80,12 +80,16 @@ class Board:
             pos = pygame.mouse.get_pos()
             pos = ((pos[0] - Origin[0]) // Tile_Size, (pos[1] - Origin[1]) // Tile_Size)
 
-            if self.tiles[pos] != None and  self.tiles[pos].color == self.turn:
+            if self.selected_piece != None and self.selected_piece.type == 'King' and pos in self.selected_piece.legal_moves and self.tiles[pos] != None and self.tiles[pos].color == self.turn:
+                pass
+
+            elif self.tiles[pos] != None and self.tiles[pos].color == self.turn:
                 self.selected_piece = self.tiles[pos]
 
             elif self.selected_piece != None and pos in self.selected_piece.legal_moves:
                 self.moving_piece = True
                 self.target = (pos[0] * Tile_Size + Origin[0], pos[1] * Tile_Size + Origin[1])
+                self.selected_piece.castle = False
 
             else:
                 self.selected_piece = None
@@ -144,7 +148,8 @@ class Piece(pygame.sprite.Sprite):
         self.type = type
         self.color = color
         self.tile = tile
-        self.legal_moves = [(3,3),(0,1), (6,5)]
+        self.castle = True # Is true if the piece hasent moved yet as only  if the pieces havent move can they castle
+        self.legal_moves = [(3,3),(0,1), (6,5),(4,4),(1,3)]
 
         # Creates piece image from sprite sheet
         surf = pygame.Surface((Tile_Size, Tile_Size), pygame.SRCALPHA, 32)

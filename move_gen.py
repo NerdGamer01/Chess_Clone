@@ -26,6 +26,7 @@ for i in range(7):
     anti_diag = shift_bb(anti_diag, 'w')
     anti_diag_mask[14 - i] = anti_diag
 
+
 # Generates moves for sliding pieces in vertical and horizontal direction
 # Movements for sliding pieces are found using kindergarten procedure
 def straight_moves(piece, occupied_tiles, lookup_tables):
@@ -53,6 +54,7 @@ def straight_moves(piece, occupied_tiles, lookup_tables):
 
     return rank_moves | file_moves
 
+
 # Generates diagonal movements
 def diagonal_moves(piece, occupied_tiles, lookup_tables):
     diag_moves = occupied_tiles & diag_mask[piece.tile[0] + piece.tile[1]]
@@ -67,7 +69,8 @@ def diagonal_moves(piece, occupied_tiles, lookup_tables):
 
     return diag_moves | anti_diag_moves
 
-def attack_moves(piece, occupied_tiles, lookup_tables,type=0):
+
+def attack_moves(piece, occupied_tiles, lookup_tables, type=0):
     if type == 0:
         type = piece.type
 
@@ -82,10 +85,11 @@ def attack_moves(piece, occupied_tiles, lookup_tables,type=0):
         if type == 'Rook' or type == 'Queen':
             bb = bb | straight_moves(piece, occupied_tiles, lookup_tables)
 
-        if piece.type == 'Bishop' or type == 'Queen':
+        if type == 'Bishop' or type == 'Queen':
             bb = bb | diagonal_moves(piece, occupied_tiles, lookup_tables)
 
     return bb
+
 
 # The legal moves are generated via the procedure described here:
 # https://peterellisjones.com/posts/generating-legal-chess-moves-efficiently/
@@ -115,6 +119,7 @@ def generate_legal_moves(tiles, turn, lookup_tables):
 
     friendly_pieces_bb = np.uint64(0)
     friendly_pieces_bb_no_king = np.uint64(0)
+    friendly_rooks = []
     enemy_pieces_bb = np.uint64(0)
     enemy_pieces_types_bb = {}
     for type in ('King', 'Queen', 'Bishop', 'Knight', 'Rook', 'Pawn'):
@@ -126,6 +131,10 @@ def generate_legal_moves(tiles, turn, lookup_tables):
 
         if piece.type != 'King':
             friendly_pieces_bb_no_king = friendly_pieces_bb_no_king | piece.bb
+
+            if piece.type == 'Rook':
+                friendly_rooks.append(piece)
+
         else:
             friendly_king = piece
 
@@ -140,20 +149,17 @@ def generate_legal_moves(tiles, turn, lookup_tables):
     # Creates bitboard of all tiles attacked by the enemy ignoring the friendly king
     # These are then the tiles the king can't move to or it would be in check
     king_danger_tiles = np.uint64(0)
+    attacked_tiles = np.uint64(0)
 
     for piece in enemy_pieces:
-        king_danger_tiles = king_danger_tiles | attack_moves(piece,occupied_tiles_no_king,lookup_tables)
-
-    # Finds legal moves for king
-    moves = lookup_tables['King_Moves'][friendly_king.bb_pos_index()]
-    moves = moves & (~king_danger_tiles) & (~friendly_pieces_bb)
-    piece.update_legal_moves(moves)
+        king_danger_tiles = king_danger_tiles | attack_moves(piece, occupied_tiles_no_king, lookup_tables)
+        attacked_tiles = attacked_tiles | attack_moves(piece, occupied_tiles, lookup_tables)
 
     # Next it checks if the player king is in check as if it is the moves the player can make is very limited
     # Also creates bitboard of all pieces putting the king in check
     attackers = np.uint64(0)
     for type in ('King', 'Queen', 'Bishop', 'Knight', 'Rook', 'Pawn'):
-        attack = attack_moves(piece, occupied_tiles, lookup_tables, type=type)
+        attack = attack_moves(friendly_king, occupied_tiles, lookup_tables, type=type)
         attackers = attackers | (attack & enemy_pieces_types_bb[type])
 
     # Counts how many pieces are putting the king in check
@@ -164,9 +170,47 @@ def generate_legal_moves(tiles, turn, lookup_tables):
 
     # If the king is in check by more the one piece only the king can move
     if num_checks > 1:
+        for piece in friendly_pieces:
+            piece.legal_moves = []
+
+        moves = lookup_tables['King_Moves'][friendly_king.bb_pos_index()]
+        moves = moves & (~king_danger_tiles) & (~friendly_pieces_bb)
+        piece.update_legal_moves(moves)
         return
+
     elif num_checks == 1:
-        pass
+        check_mask = attackers
+        attacking_sliders = attackers & (enemy_pieces_types_bb['Queen'] | enemy_pieces_types_bb['Rook'] | enemy_pieces_types_bb['Bishop'])
+        attacking_sliders = '{0:064b}'.format(attacking_sliders)
+
+        for i in range(64):
+            if attacking_sliders[i] == '1':
+                pos = (i - ((i // 8) * 8), i // 8)
+                difference = (pos[0] - friendly_king.tile[0], pos[1] - friendly_king.tile[1])
+                direction = ''
+
+                if difference[1] > 0:
+                    direction += 'n'
+                elif difference[1] < 0:
+                    direction += 's'
+
+                if difference[0] < 0:
+                    direction += 'e'
+                elif difference[0] > 0:
+                    direction += 'w'
+
+                if difference[0] >= difference[1]:
+                    difference = np.abs(difference[0]) - 1
+                else:
+                    difference = np.abs(difference[1]) - 1
+
+                bb = tiles[pos].bb()
+                for x in range(difference):
+                    bb = shift_bb(bb, direction)
+                    check_mask = check_mask | bb
+
+    else:
+        check_mask = ~np.uint64(0)
 
     # Finds legal moves
     for piece in friendly_pieces:
@@ -174,4 +218,24 @@ def generate_legal_moves(tiles, turn, lookup_tables):
             moves = lookup_tables['Knight_Moves'][piece.bb_pos_index()] & (~friendly_pieces_bb)
             piece.update_legal_moves(moves)
 
+        elif piece.type == 'King':
+            moves = lookup_tables['King_Moves'][friendly_king.bb_pos_index()]
+            moves = moves & (~king_danger_tiles) & (~friendly_pieces_bb)
+
+            # Implements castle moves if applicable
+            if piece.castle:
+                for rook in friendly_rooks:
+                    if rook.castle:
+                        if rook.tile[0] == 0:
+                            gap = (files[1] | files[2] | files[3])
+
+                        else:
+                            gap = files[5] | files[6]
+
+                        bb = ((friendly_pieces_bb & gap) | (gap & attacked_tiles)) & ranks[piece.tile[1]]
+                        print_bb(gap)
+                        if bb == np.uint64(0):
+                            moves = moves | rook.bb
+
+            piece.update_legal_moves(moves)
     print_bb(king_danger_tiles)
