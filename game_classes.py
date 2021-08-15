@@ -38,6 +38,7 @@ class Board:
         self.tiles = {} # A dictionary containing all the pieces with the tile coordinate as the key
         self.sprites = pygame.sprite.Group()
         self.lookup_tables = lookup_tables
+        self.castling = False
 
         for x in range(8):
             for y in range(8):
@@ -81,7 +82,21 @@ class Board:
             pos = ((pos[0] - Origin[0]) // Tile_Size, (pos[1] - Origin[1]) // Tile_Size)
 
             if self.selected_piece != None and self.selected_piece.type == 'King' and pos in self.selected_piece.legal_moves and self.tiles[pos] != None and self.tiles[pos].color == self.turn:
-                pass
+                self.moving_piece = True
+                self.castling = True
+                self.castling_rook = self.tiles[pos]
+                self.castling_rook.castle = False
+                self.selected_piece.castle = False
+
+                if self.castling_rook.tile[0] == 0:
+                    self.target = (2, self.selected_piece.tile[1])
+                    self.castling_rook_target = (3, self.castling_rook.tile[1])
+                else:
+                    self.target = (6, self.selected_piece.tile[1])
+                    self.castling_rook_target = (5, self.castling_rook.tile[1])
+
+                self.target = (self.target[0] * Tile_Size + Origin[0], self.target[1] * Tile_Size + Origin[1])
+                self.castling_rook_target = (self.castling_rook_target[0] * Tile_Size + Origin[0], self.castling_rook_target[1] * Tile_Size + Origin[1])
 
             elif self.tiles[pos] != None and self.tiles[pos].color == self.turn:
                 self.selected_piece = self.tiles[pos]
@@ -98,27 +113,38 @@ class Board:
         # Updates movement animation and when done updates the tiles with the boards new configuration and ends turn
         self.selected_piece.move(self.target, dt)
 
-        if self.selected_piece.completed_movement(self.target):
+        if self.castling:
+            self.castling_rook.move(self.castling_rook_target, dt)
+
+            if self.castling_rook.completed_movement(self.castling_rook_target):
+                self.castling_rook_target = ((self.castling_rook_target[0] - Origin[0]) // Tile_Size, (self.castling_rook_target[1] - Origin[1]) // Tile_Size)
+                self.castling = False
+                self.update_tiles(self.castling_rook, self.castling_rook_target)
+
+        if self.selected_piece.completed_movement(self.target) and not self.castling:
             self.target = ((self.target[0] - Origin[0]) // Tile_Size, (self.target[1] - Origin[1]) // Tile_Size)
 
             if self.tiles[self.target] != None:
                 self.tiles[self.target].kill()
 
-            self.tiles[self.target] = self.selected_piece
-            self.tiles[self.selected_piece.tile] = None
-            self.selected_piece.tile = self.target
-            self.moving_piece = False
-            self.selected_piece = None
-
+            self.update_tiles(self.selected_piece, self.target)
             self.end_turn()
 
     def end_turn(self):
+        self.selected_piece = None
+        self.moving_piece = False
+
         if self.turn == 'White':
             self.turn = 'Black'
         else:
             self.turn = 'White'
 
         generate_legal_moves(self.tiles, self.turn, self.lookup_tables)
+
+    def update_tiles(self, piece, target):
+        self.tiles[target] = piece
+        self.tiles[piece.tile] = None
+        piece.tile = target
 
     def draw(self, screen):
         # Draws Background
@@ -169,12 +195,13 @@ class Piece(pygame.sprite.Sprite):
         self.rect.topleft = (tile[0] * Tile_Size + Origin[0], tile[1] * Tile_Size + Origin[1])
 
     def move(self, target, dt):
-        direction_x = target[0] - self.rect.x
-        direction_y = target[1] - self.rect.y
-        modulus = np.sqrt((direction_y ** 2) + (direction_x ** 2))
-        speed = 0.3
-        self.rect.x = self.rect.x + ((direction_x * speed * dt) / modulus)
-        self.rect.y = self.rect.y + ((direction_y * speed * dt) / modulus)
+        if self.rect.x != target[0] or self.rect.y != target[1]:
+            direction_x = target[0] - self.rect.x
+            direction_y = target[1] - self.rect.y
+            modulus = np.sqrt((direction_y ** 2) + (direction_x ** 2))
+            speed = 0.3
+            self.rect.x = self.rect.x + ((direction_x * speed * dt) / modulus)
+            self.rect.y = self.rect.y + ((direction_y * speed * dt) / modulus)
 
     def completed_movement(self, target):
         error = 0.06
@@ -192,6 +219,7 @@ class Piece(pygame.sprite.Sprite):
         bb[self.bb_pos_index()] = '1'
         bb = ''.join(bb)
         self.bb = np.uint64(int(bb,2))
+        self.pinned_mask = ~np.uint64(0)
 
     # Return index for pieces position on a bitboard
     def bb_pos_index(self):

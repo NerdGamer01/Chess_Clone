@@ -66,9 +66,9 @@ def generate_lookup_tables():
     pos = bb_first()
 
     for i in range(64):
-        lookup_tables['Black_Pawn_Moves'][i] = shift_bb(pos, 'n')
+        lookup_tables['Black_Pawn_Moves'][i] = shift_bb(pos, 's')
         if i > 7 and i < 16:
-            lookup_tables['Black_Pawn_Moves'][i] = lookup_tables['Black_Pawn_Moves'][i] | shift_bb(lookup_tables['Black_Pawn_Moves'][i], 'n')
+            lookup_tables['Black_Pawn_Moves'][i] = lookup_tables['Black_Pawn_Moves'][i] | shift_bb(lookup_tables['Black_Pawn_Moves'][i], 's')
         pos = pos >> np.uint8(1)
 
     # Generates bottom rank moves for kindergarten approach for sliding pieces
