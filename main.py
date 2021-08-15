@@ -1,4 +1,4 @@
-from constants import Tile_Size, Window_Size
+from constants import Window_Size
 from lookup_tables import generate_lookup_tables
 from game_classes import Board
 import pygame
