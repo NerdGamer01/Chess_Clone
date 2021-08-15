@@ -1,4 +1,4 @@
-from constants import Tile_Size
+from constants import Tile_Size, Window_Size
 from lookup_tables import generate_lookup_tables
 from game_classes import Board
 import pygame
@@ -6,7 +6,7 @@ import pygame
 pygame.init()
 
 # Set up the drawing window
-screen = pygame.display.set_mode([Tile_Size * 8, Tile_Size * 8])
+screen = pygame.display.set_mode([Window_Size, Window_Size])
 
 clock = pygame.time.Clock()
 

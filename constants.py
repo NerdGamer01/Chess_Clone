@@ -1,8 +1,10 @@
 import numpy as np
 
-Tile_Size = 80  # Size of chess tiles
+Tile_Size = 70  # Size of chess tiles
 Tile_Color = (100, 30, 30)  # Color of chess tiles
-Origin = (0, 0)  # Origin point of the chess board
+Boarder_Width = Tile_Size // 2
+Origin = (Boarder_Width, Boarder_Width)  # Origin point of the chess board
+Window_Size = (Tile_Size * 8) + (Boarder_Width * 2)
 
 # Creates arrays of bitboards where each bit board has a file/rank filled with ones
 ranks = np.flip(np.array([np.uint64(0x00000000000000FF) << np.uint8(8 * i) for i in range(8)], dtype=np.uint64))

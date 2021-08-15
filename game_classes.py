@@ -1,16 +1,35 @@
-from constants import Tile_Size, Origin, Tile_Color
+from constants import Tile_Size, Origin, Tile_Color, Window_Size, Boarder_Width
 from move_gen import generate_legal_moves
 import numpy as np
 import pygame
 
 # Creates background
-background = pygame.Surface((Tile_Size * 8, Tile_Size * 8))
+background = pygame.Surface((Window_Size, Window_Size))
 background.fill((255, 255, 255))
+width = Boarder_Width // 10
+pygame.draw.rect(background, (0,0,0), pygame.Rect(Origin[0] - width, Origin[1] - width, Tile_Size * 8 + width * 2, Tile_Size * 8 + width * 2))
+pygame.draw.rect(background, (255,255,255), pygame.Rect(Origin[0], Origin[1], Tile_Size * 8, Tile_Size * 8))
+pygame.font.init()
+myfont = pygame.font.SysFont('arial', Boarder_Width - width * 3,bold=True)
+letters = ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H')
+
+for i in range(8):
+    textsurface = myfont.render(letters[i], False, (0, 0, 0))
+    size = textsurface.get_size()
+    background.blit(textsurface, ((Tile_Size // 2) - (size[0] // 2) + Origin[0] + Tile_Size * i, width))
+    background.blit(textsurface, ((Tile_Size // 2) - (size[0] // 2) + Origin[0] + Tile_Size * i, Boarder_Width + width +Tile_Size * 8))
+
+    textsurface = myfont.render(str(i), False, (0, 0, 0))
+    size = textsurface.get_size()
+    background.blit(textsurface, (((Boarder_Width - width) // 2) - (size[0] // 2), (Tile_Size // 2) - (size[1] // 2) + Origin[1] + Tile_Size * i))
+    background.blit(textsurface, (((Boarder_Width - width) // 2) - (size[0] // 2) + Origin[0] + Tile_Size * 8 + width, (Tile_Size // 2) - (size[1] // 2) + Origin[1] + Tile_Size * i))
+
 x = 1
 y = 0
-while y < 9:
-    while x < 9:
-        pygame.draw.rect(background, Tile_Color,pygame.Rect(x * Tile_Size + Origin[0], y * Tile_Size + Origin[1], Tile_Size,Tile_Size))
+while y < 8:
+    while x < 8:
+        if  x >= 0:
+            pygame.draw.rect(background, Tile_Color,pygame.Rect(x * Tile_Size + Origin[0], y * Tile_Size + Origin[1], Tile_Size,Tile_Size))
         x += 2
     y += 1
     x -= 9
@@ -148,7 +167,7 @@ class Board:
 
     def draw(self, screen):
         # Draws Background
-        screen.blit(background, Origin)
+        screen.blit(background, (0, 0))
 
         # Highlights selected piece
         if self.selected_piece != None:
