@@ -93,17 +93,20 @@ class Board:
 
     def update(self, clicked, dt):
         if clicked and not self.moving_piece:
-            self.select_piece()
+            self.process_player_click()
 
         elif self.moving_piece:
             self.update_move(dt)
 
-    def select_piece(self):
+    def process_player_click(self):
         # Process the player clicking on the board and select/deselects pieces
         # Also initiates a move if applicable
         if not self.AI or (self.AI and self.turn == 'White'):
             pos = pygame.mouse.get_pos()
             pos = ((pos[0] - Origin[0]) // Tile_Size, (pos[1] - Origin[1]) // Tile_Size)
+
+            if pos[0] < 0 or pos[0] > 7 or pos[1] < 0 or pos[0] > 7:
+                return
 
             if self.selected_piece != None and self.selected_piece.type == 'King' and pos in self.selected_piece.legal_moves and \
                     self.tiles[pos] != None and self.tiles[pos].color == self.turn:
