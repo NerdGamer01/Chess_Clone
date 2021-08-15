@@ -21,7 +21,7 @@ for i in range(8):
     background.blit(textsurface, (
     (Tile_Size // 2) - (size[0] // 2) + Origin[0] + Tile_Size * i, Boarder_Width + width + Tile_Size * 8))
 
-    textsurface = myfont.render(str(i), False, (0, 0, 0))
+    textsurface = myfont.render(str(i + 1), False, (0, 0, 0))
     size = textsurface.get_size()
     background.blit(textsurface, (
     ((Boarder_Width - width) // 2) - (size[0] // 2), (Tile_Size // 2) - (size[1] // 2) + Origin[1] + Tile_Size * i))
