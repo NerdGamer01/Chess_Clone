@@ -305,7 +305,6 @@ def generate_legal_moves(tiles, turn, lookup_tables):
             moves = moves & enemy_pieces_bb
             mask = straight_moves(piece, occupied_tiles, lookup_tables)
             moves = moves | (mask & lookup_tables[piece.color + '_Pawn_Moves'][piece.bb_pos_index()])
-            print_bb(lookup_tables[piece.color + '_Pawn_Moves'][piece.bb_pos_index()])
 
         moves = moves & (~friendly_pieces_bb) & check_mask & piece.pinned_mask
         piece.update_legal_moves(moves)
