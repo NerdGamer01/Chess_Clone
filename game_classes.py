@@ -7,29 +7,34 @@ import pygame
 background = pygame.Surface((Window_Size, Window_Size))
 background.fill((255, 255, 255))
 width = Boarder_Width // 10
-pygame.draw.rect(background, (0,0,0), pygame.Rect(Origin[0] - width, Origin[1] - width, Tile_Size * 8 + width * 2, Tile_Size * 8 + width * 2))
-pygame.draw.rect(background, (255,255,255), pygame.Rect(Origin[0], Origin[1], Tile_Size * 8, Tile_Size * 8))
+pygame.draw.rect(background, (0, 0, 0), pygame.Rect(Origin[0] - width, Origin[1] - width, Tile_Size * 8 + width * 2,
+                                                    Tile_Size * 8 + width * 2))
+pygame.draw.rect(background, (255, 255, 255), pygame.Rect(Origin[0], Origin[1], Tile_Size * 8, Tile_Size * 8))
 pygame.font.init()
-myfont = pygame.font.SysFont('arial', Boarder_Width - width * 3,bold=True)
+myfont = pygame.font.SysFont('arial', Boarder_Width - width * 3, bold=True)
 letters = ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H')
 
 for i in range(8):
     textsurface = myfont.render(letters[i], False, (0, 0, 0))
     size = textsurface.get_size()
     background.blit(textsurface, ((Tile_Size // 2) - (size[0] // 2) + Origin[0] + Tile_Size * i, width))
-    background.blit(textsurface, ((Tile_Size // 2) - (size[0] // 2) + Origin[0] + Tile_Size * i, Boarder_Width + width +Tile_Size * 8))
+    background.blit(textsurface, (
+    (Tile_Size // 2) - (size[0] // 2) + Origin[0] + Tile_Size * i, Boarder_Width + width + Tile_Size * 8))
 
     textsurface = myfont.render(str(i), False, (0, 0, 0))
     size = textsurface.get_size()
-    background.blit(textsurface, (((Boarder_Width - width) // 2) - (size[0] // 2), (Tile_Size // 2) - (size[1] // 2) + Origin[1] + Tile_Size * i))
-    background.blit(textsurface, (((Boarder_Width - width) // 2) - (size[0] // 2) + Origin[0] + Tile_Size * 8 + width, (Tile_Size // 2) - (size[1] // 2) + Origin[1] + Tile_Size * i))
+    background.blit(textsurface, (
+    ((Boarder_Width - width) // 2) - (size[0] // 2), (Tile_Size // 2) - (size[1] // 2) + Origin[1] + Tile_Size * i))
+    background.blit(textsurface, (((Boarder_Width - width) // 2) - (size[0] // 2) + Origin[0] + Tile_Size * 8 + width,
+                                  (Tile_Size // 2) - (size[1] // 2) + Origin[1] + Tile_Size * i))
 
 x = 1
 y = 0
 while y < 8:
     while x < 8:
-        if  x >= 0:
-            pygame.draw.rect(background, Tile_Color,pygame.Rect(x * Tile_Size + Origin[0], y * Tile_Size + Origin[1], Tile_Size,Tile_Size))
+        if x >= 0:
+            pygame.draw.rect(background, Tile_Color,
+                             pygame.Rect(x * Tile_Size + Origin[0], y * Tile_Size + Origin[1], Tile_Size, Tile_Size))
         x += 2
     y += 1
     x -= 9
@@ -37,24 +42,25 @@ while y < 8:
 # Creates movement indicators
 target_indicator = pygame.Surface((Tile_Size, Tile_Size), pygame.SRCALPHA, 32)
 target_indicator.set_alpha(150)
-pygame.draw.circle(target_indicator, (0, 0, 0), (Tile_Size / 2, Tile_Size / 2), (Tile_Size / 2) - (Tile_Size / 40), width=Tile_Size // 10)
+pygame.draw.circle(target_indicator, (0, 0, 0), (Tile_Size / 2, Tile_Size / 2), (Tile_Size / 2) - (Tile_Size / 40),
+                   width=Tile_Size // 10)
 
 tile_indicator = pygame.Surface((Tile_Size, Tile_Size), pygame.SRCALPHA, 32)
 tile_indicator.set_alpha(150)
 pygame.draw.circle(tile_indicator, (0, 0, 0), (Tile_Size / 2, Tile_Size / 2), Tile_Size // 5)
 
 selected_indicator = pygame.Surface((Tile_Size, Tile_Size), pygame.SRCALPHA, 32)
-selected_indicator.fill((255,255,0))
+selected_indicator.fill((255, 255, 0))
 selected_indicator.set_alpha(100)
 
 
 class Board:
     def __init__(self, lookup_tables, AI, save_file=None):
-        self.turn = 'White' # Which turn it is
-        self.selected_piece = None # The piece currently selected by the player
-        self.AI = AI # Is this a round with or without ai
-        self.moving_piece = False # Is a piece currently moving
-        self.tiles = {} # A dictionary containing all the pieces with the tile coordinate as the key
+        self.turn = 'White'  # Which turn it is
+        self.selected_piece = None  # The piece currently selected by the player
+        self.AI = AI  # Is this a round with or without ai
+        self.moving_piece = False  # Is a piece currently moving
+        self.tiles = {}  # A dictionary containing all the pieces with the tile coordinate as the key
         self.sprites = pygame.sprite.Group()
         self.lookup_tables = lookup_tables
         self.castling = False
@@ -67,7 +73,6 @@ class Board:
         if save_file == None:
             # Initiates Black Chess Pieces
             piece_order = ['Rook', 'Knight', 'Bishop', 'Queen', 'King', 'Bishop', 'Knight', 'Rook']
-
 
             for x in range(8):
                 self.tiles[(x, 0)] = Piece(piece_order[x], 'Black', (x, 0))
@@ -86,7 +91,7 @@ class Board:
 
         generate_legal_moves(self.tiles, self.turn, lookup_tables)
 
-    def update(self,clicked, dt):
+    def update(self, clicked, dt):
         if clicked and not self.moving_piece:
             self.select_piece()
 
@@ -100,7 +105,8 @@ class Board:
             pos = pygame.mouse.get_pos()
             pos = ((pos[0] - Origin[0]) // Tile_Size, (pos[1] - Origin[1]) // Tile_Size)
 
-            if self.selected_piece != None and self.selected_piece.type == 'King' and pos in self.selected_piece.legal_moves and self.tiles[pos] != None and self.tiles[pos].color == self.turn:
+            if self.selected_piece != None and self.selected_piece.type == 'King' and pos in self.selected_piece.legal_moves and \
+                    self.tiles[pos] != None and self.tiles[pos].color == self.turn:
                 self.moving_piece = True
                 self.castling = True
                 self.castling_rook = self.tiles[pos]
@@ -115,7 +121,8 @@ class Board:
                     self.castling_rook_target = (5, self.castling_rook.tile[1])
 
                 self.target = (self.target[0] * Tile_Size + Origin[0], self.target[1] * Tile_Size + Origin[1])
-                self.castling_rook_target = (self.castling_rook_target[0] * Tile_Size + Origin[0], self.castling_rook_target[1] * Tile_Size + Origin[1])
+                self.castling_rook_target = (self.castling_rook_target[0] * Tile_Size + Origin[0],
+                                             self.castling_rook_target[1] * Tile_Size + Origin[1])
 
             elif self.tiles[pos] != None and self.tiles[pos].color == self.turn:
                 self.selected_piece = self.tiles[pos]
@@ -136,7 +143,8 @@ class Board:
             self.castling_rook.move(self.castling_rook_target, dt)
 
             if self.castling_rook.completed_movement(self.castling_rook_target):
-                self.castling_rook_target = ((self.castling_rook_target[0] - Origin[0]) // Tile_Size, (self.castling_rook_target[1] - Origin[1]) // Tile_Size)
+                self.castling_rook_target = ((self.castling_rook_target[0] - Origin[0]) // Tile_Size,
+                                             (self.castling_rook_target[1] - Origin[1]) // Tile_Size)
                 self.castling = False
                 self.update_tiles(self.castling_rook, self.castling_rook_target)
 
@@ -172,7 +180,8 @@ class Board:
         # Highlights selected piece
         if self.selected_piece != None:
             screen.blit(selected_indicator, (
-            self.selected_piece.tile[0] * Tile_Size + Origin[0], self.selected_piece.tile[1] * Tile_Size + Origin[1]))
+                self.selected_piece.tile[0] * Tile_Size + Origin[0],
+                self.selected_piece.tile[1] * Tile_Size + Origin[1]))
 
         # Draws Chess Pieces
         self.sprites.draw(screen)
@@ -193,8 +202,8 @@ class Piece(pygame.sprite.Sprite):
         self.type = type
         self.color = color
         self.tile = tile
-        self.castle = True # Is true if the piece hasent moved yet as only  if the pieces havent move can they castle
-        self.legal_moves = [(3,3),(0,1), (6,5),(4,4),(1,3)]
+        self.castle = True  # Is true if the piece hasent moved yet as only  if the pieces havent move can they castle
+        self.legal_moves = [(3, 3), (0, 1), (6, 5), (4, 4), (1, 3)]
 
         # Creates piece image from sprite sheet
         surf = pygame.Surface((Tile_Size, Tile_Size), pygame.SRCALPHA, 32)
@@ -225,7 +234,8 @@ class Piece(pygame.sprite.Sprite):
     def completed_movement(self, target):
         error = 0.06
 
-        if (target[0] - Tile_Size * error <= self.rect.x and target[0] + Tile_Size * error >= self.rect.x) and (target[1] - Tile_Size * error <= self.rect.y and target[1] + Tile_Size * error >= self.rect.y):
+        if (target[0] - Tile_Size * error <= self.rect.x and target[0] + Tile_Size * error >= self.rect.x) and (
+                target[1] - Tile_Size * error <= self.rect.y and target[1] + Tile_Size * error >= self.rect.y):
             self.rect.x = target[0]
             self.rect.y = target[1]
             return True
@@ -237,14 +247,14 @@ class Piece(pygame.sprite.Sprite):
         bb = ['0'] * 64
         bb[self.bb_pos_index()] = '1'
         bb = ''.join(bb)
-        self.bb = np.uint64(int(bb,2))
+        self.bb = np.uint64(int(bb, 2))
         self.pinned_mask = ~np.uint64(0)
 
     # Return index for pieces position on a bitboard
     def bb_pos_index(self):
         return self.tile[1] * 8 + self.tile[0]
 
-    def update_legal_moves(self,bb):
+    def update_legal_moves(self, bb):
         bb = '{0:064b}'.format(bb)
         self.legal_moves = []
         for i in range(64):

@@ -69,6 +69,7 @@ def diagonal_moves(piece, occupied_tiles, lookup_tables):
 
     return diag_moves | anti_diag_moves
 
+
 # Finds tiles a piece can attack
 def attack_moves(piece, occupied_tiles, lookup_tables, type=0):
     if type == 0:
@@ -90,12 +91,14 @@ def attack_moves(piece, occupied_tiles, lookup_tables, type=0):
 
     return bb
 
+
 # Finds the tile on which a bit is
 def find_tile(bb):
     bb = '{0:064b}'.format(bb)
     for i in range(64):
         if bb[i] == '1':
             return (i - (8 * (i // 8)), i // 8)
+
 
 def in_between_tiles(tile1, tile2):
     difference = (tile1[0] - tile2[0], tile1[1] - tile2[1])
@@ -127,6 +130,7 @@ def in_between_tiles(tile1, tile2):
         result = result | bb
 
     return result
+
 
 # The legal moves are generated via the procedure described here:
 # https://peterellisjones.com/posts/generating-legal-chess-moves-efficiently/
@@ -188,7 +192,6 @@ def generate_legal_moves(tiles, turn, lookup_tables):
         if piece.type == 'Queen' or piece.type == 'Bishop':
             enemy_sliders['Diagonal'].append(piece)
 
-
     occupied_tiles = enemy_pieces_bb | friendly_pieces_bb
     occupied_tiles_no_king = enemy_pieces_bb | friendly_pieces_bb_no_king
 
@@ -226,7 +229,8 @@ def generate_legal_moves(tiles, turn, lookup_tables):
 
     elif num_checks == 1:
         check_mask = attackers
-        attacking_sliders = attackers & (enemy_pieces_types_bb['Queen'] | enemy_pieces_types_bb['Rook'] | enemy_pieces_types_bb['Bishop'])
+        attacking_sliders = attackers & (
+                    enemy_pieces_types_bb['Queen'] | enemy_pieces_types_bb['Rook'] | enemy_pieces_types_bb['Bishop'])
         attacking_sliders = '{0:064b}'.format(attacking_sliders)
 
         for i in range(64):
@@ -304,7 +308,8 @@ def generate_legal_moves(tiles, turn, lookup_tables):
         elif piece.type == 'Pawn':
             moves = moves & enemy_pieces_bb
             mask = straight_moves(piece, occupied_tiles, lookup_tables)
-            moves = moves | (mask & lookup_tables[piece.color + '_Pawn_Moves'][piece.bb_pos_index()] & (~occupied_tiles))
+            moves = moves | (
+                        mask & lookup_tables[piece.color + '_Pawn_Moves'][piece.bb_pos_index()] & (~occupied_tiles))
 
         moves = moves & (~friendly_pieces_bb) & check_mask & piece.pinned_mask
         piece.update_legal_moves(moves)
