@@ -11,17 +11,17 @@ pygame.draw.rect(background, (0, 0, 0), pygame.Rect(Origin[0] - width, Origin[1]
                                                     Tile_Size * 8 + width * 2))
 pygame.draw.rect(background, (255, 255, 255), pygame.Rect(Origin[0], Origin[1], Tile_Size * 8, Tile_Size * 8))
 pygame.font.init()
-myfont = pygame.font.SysFont('arial', Boarder_Width - width * 3, bold=True)
+font = pygame.font.SysFont('arial', Boarder_Width - width * 3, bold=True)
 letters = ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H')
 
 for i in range(8):
-    textsurface = myfont.render(letters[i], False, (0, 0, 0))
+    textsurface = font.render(letters[i], False, (0, 0, 0))
     size = textsurface.get_size()
     background.blit(textsurface, ((Tile_Size // 2) - (size[0] // 2) + Origin[0] + Tile_Size * i, width))
     background.blit(textsurface, (
     (Tile_Size // 2) - (size[0] // 2) + Origin[0] + Tile_Size * i, Boarder_Width + width + Tile_Size * 8))
 
-    textsurface = myfont.render(str(i + 1), False, (0, 0, 0))
+    textsurface = font.render(str(i + 1), False, (0, 0, 0))
     size = textsurface.get_size()
     background.blit(textsurface, (
     ((Boarder_Width - width) // 2) - (size[0] // 2), (Tile_Size // 2) - (size[1] // 2) + Origin[1] + Tile_Size * i))
@@ -105,7 +105,7 @@ class Board:
             pos = pygame.mouse.get_pos()
             pos = ((pos[0] - Origin[0]) // Tile_Size, (pos[1] - Origin[1]) // Tile_Size)
 
-            if pos[0] < 0 or pos[0] > 7 or pos[1] < 0 or pos[0] > 7:
+            if pos[0] < 0 or pos[0] > 7 or pos[1] < 0 or pos[1] > 7:
                 return
 
             if self.selected_piece != None and self.selected_piece.type == 'King' and pos in self.selected_piece.legal_moves and \
@@ -186,9 +186,6 @@ class Board:
                 self.selected_piece.tile[0] * Tile_Size + Origin[0],
                 self.selected_piece.tile[1] * Tile_Size + Origin[1]))
 
-        # Draws Chess Pieces
-        self.sprites.draw(screen)
-
         # Draws movement indicators
         if self.selected_piece != None:
             for tile in self.selected_piece.legal_moves:
@@ -196,6 +193,9 @@ class Board:
                     screen.blit(tile_indicator, (tile[0] * Tile_Size + Origin[0], tile[1] * Tile_Size + Origin[1]))
                 else:
                     screen.blit(target_indicator, (tile[0] * Tile_Size + Origin[0], tile[1] * Tile_Size + Origin[1]))
+
+        # Draws Chess Pieces
+        self.sprites.draw(screen)
 
 
 # Class for individual chess pieces
