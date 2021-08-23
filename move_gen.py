@@ -1,4 +1,4 @@
-from bitboard_functions import print_bb, shift_bb
+from bitboard_functions import shift_bb
 from constants import anti_diagonal, files, ranks, diagonal
 import numpy as np
 
@@ -100,6 +100,7 @@ def find_tile(bb):
             return (i - (8 * (i // 8)), i // 8)
 
 
+# Creates a bitboard with all bits between two tiles set to one
 def in_between_tiles(tile1, tile2):
     difference = (tile1[0] - tile2[0], tile1[1] - tile2[1])
     direction = ''

@@ -1,7 +1,7 @@
 from constants import Window_Size
 from lookup_tables import generate_lookup_tables
 from game_classes import Board
-from menu_classes import Menu
+from menu_classes import Menu, File_Menu
 import pygame
 
 pygame.init()
@@ -23,6 +23,8 @@ Main_Menu = Menu(['New Game', 'Load Game', 'Quit Game'], center=False, main_menu
 Pause_Menu = Menu(['Resume Game', 'Save Game', 'Load Game', 'Main Menu', 'Quit Game'])
 Are_You_Sure_Menu = Menu(['Yes', 'No'], center=False, text=['Are you sure you want to quit the game?',
                                                             'All unsaved progress will be lost.'])
+Save_File_Menu = File_Menu('save')
+Load_File_Menu = File_Menu('load')
 
 # Main game loop
 running = True
@@ -65,6 +67,10 @@ while running:
             game = True
             window = 0
 
+        elif selected_button == 'Load Game':
+            window = 4
+            previous_window = 1
+
         elif selected_button == 'Quit Game':
             running = False
 
@@ -84,6 +90,16 @@ while running:
             window = 5
             previous_window = 2
             end_window = 'Quit'
+
+    elif window == 3:
+        Save_File_Menu.draw(screen)
+
+    elif window == 4:
+        Load_File_Menu.draw(screen)
+        selected_button = Load_File_Menu.check_button_press(clicked)
+
+        if selected_button == 'Cancel':
+            window = previous_window
 
     elif window == 5:
         Are_You_Sure_Menu.draw(screen)

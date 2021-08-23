@@ -3,7 +3,7 @@ from move_gen import generate_legal_moves
 import numpy as np
 import pygame
 
-# Creates background
+# Creates game background
 background = pygame.Surface((Window_Size, Window_Size))
 background.fill((255, 255, 255))
 width = Boarder_Width // 10
