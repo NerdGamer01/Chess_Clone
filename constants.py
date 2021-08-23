@@ -6,7 +6,7 @@ Boarder_Width = Tile_Size // 2
 Origin = (Boarder_Width, Boarder_Width)  # Origin point of the chess board
 Window_Size = (Tile_Size * 8) + (Boarder_Width * 2)
 button_width = (Tile_Size * 3) // 4
-slot_width = Tile_Size * 2 + (Tile_Size // 5)
+slot_width = Tile_Size * 2 + (Tile_Size // 10)
 
 # Creates arrays of bitboards where each bit board has a file/rank filled with ones
 ranks = np.flip(np.array([np.uint64(0x00000000000000FF) << np.uint8(8 * i) for i in range(8)], dtype=np.uint64))

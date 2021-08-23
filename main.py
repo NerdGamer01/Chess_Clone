@@ -116,7 +116,6 @@ while running:
         elif selected_button == 'No':
             window = previous_window
 
-
     pygame.display.flip()
 
 pygame.quit()

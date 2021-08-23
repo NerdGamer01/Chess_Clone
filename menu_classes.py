@@ -185,6 +185,7 @@ class Save_Slot:
         self.image_not_selected.fill(Tile_Color)
         pygame.draw.rect(self.image_not_selected, (255, 255, 255), (
         border_width, border_width, Tile_Size * 4 - (border_width * 2), slot_width - (border_width * 2)))
+        pygame.draw.rect(self.image_not_selected,(0,0,0),(border_width,border_width,slot_width - (border_width * 2),slot_width - (border_width * 2)))
 
 
     def draw(self, screen):
