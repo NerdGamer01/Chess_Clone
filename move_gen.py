@@ -1,4 +1,4 @@
-from bitboard_functions import shift_bb
+from bitboard_functions import shift_bb, print_bb
 from constants import anti_diagonal, files, ranks, diagonal
 import numpy as np
 
@@ -292,6 +292,8 @@ def generate_legal_moves(tiles, turn, lookup_tables):
         if piece.type == 'King':
             moves = moves & (~king_danger_tiles)
 
+            moves = moves & (~friendly_pieces_bb)
+
             # Implements castle moves if applicable
             if piece.castle:
                 for rook in friendly_rooks:
@@ -306,7 +308,6 @@ def generate_legal_moves(tiles, turn, lookup_tables):
                         if bb == np.uint64(0):
                             moves = moves | rook.bb
 
-            moves = moves & (~friendly_pieces_bb)
 
         elif piece.type == 'Pawn':
             moves = moves & enemy_pieces_bb
