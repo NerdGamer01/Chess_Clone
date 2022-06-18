@@ -1,6 +1,9 @@
-from bitboard_functions import shift_bb, print_bb
+from bitboard_functions import shift_bb
 from constants import anti_diagonal, files, ranks, diagonal
+from lookup_tables import lookup_tables
 import numpy as np
+
+
 
 # Creates diagonal masks, use the index (x+y) to find mask corresponding to a tile
 diag = diagonal
@@ -29,7 +32,7 @@ for i in range(7):
 
 # Generates moves for sliding pieces in vertical and horizontal direction
 # Movements for sliding pieces are found using kindergarten procedure
-def straight_moves(piece, occupied_tiles, lookup_tables):
+def straight_moves(piece, occupied_tiles):
     file_moves = occupied_tiles & files[piece.tile[0]]
 
     for i in range(piece.tile[0]):
@@ -44,19 +47,17 @@ def straight_moves(piece, occupied_tiles, lookup_tables):
 
     rank_moves = occupied_tiles & ranks[piece.tile[1]]
 
-    for i in range(7 - piece.tile[1]):
-        rank_moves = shift_bb(rank_moves, 's')
+    rank_moves = rank_moves >> np.uint8(8 * (7 - piece.tile[1]))
 
     rank_moves = lookup_tables['Bottom_Rank_Moves'][piece.tile[0]][rank_moves]
 
-    for i in range(7 - piece.tile[1]):
-        rank_moves = shift_bb(rank_moves, 'n')
+    rank_moves = rank_moves << np.uint8(8 * (7 - piece.tile[1]))
 
     return rank_moves | file_moves
 
 
 # Generates diagonal movements
-def diagonal_moves(piece, occupied_tiles, lookup_tables):
+def diagonal_moves(piece, occupied_tiles):
     diag_moves = occupied_tiles & diag_mask[piece.tile[0] + piece.tile[1]]
     diag_moves = (diag_moves * files[7]) >> np.uint8(56)
     diag_moves = lookup_tables['Bottom_Rank_Moves'][piece.tile[0]][diag_moves]
@@ -71,7 +72,7 @@ def diagonal_moves(piece, occupied_tiles, lookup_tables):
 
 
 # Finds tiles a piece can attack
-def attack_moves(piece, occupied_tiles, lookup_tables, type=0):
+def attack_moves(piece, occupied_tiles, type=0):
     if type == 0:
         type = piece.type
 
@@ -84,10 +85,10 @@ def attack_moves(piece, occupied_tiles, lookup_tables, type=0):
     else:
         bb = np.uint64(0)
         if type == 'Rook' or type == 'Queen':
-            bb = bb | straight_moves(piece, occupied_tiles, lookup_tables)
+            bb = bb | straight_moves(piece, occupied_tiles)
 
         if type == 'Bishop' or type == 'Queen':
-            bb = bb | diagonal_moves(piece, occupied_tiles, lookup_tables)
+            bb = bb | diagonal_moves(piece, occupied_tiles)
 
     return bb
 
@@ -135,29 +136,10 @@ def in_between_tiles(tile1, tile2):
 
 # The legal moves are generated via the procedure described here:
 # https://peterellisjones.com/posts/generating-legal-chess-moves-efficiently/
-def generate_legal_moves(tiles, turn, lookup_tables):
+def generate_legal_moves(friendly_pieces, enemy_pieces):
     # The first section extracts the pieces from the tiles libary and sorts well into two lists
     # One for the pieces belonging to whomever turn it is (friendly pieces) and the others (enemy pieces)
     # It also creates all necessary bitboards showing occupied tiles
-    white_pieces = []
-    black_pieces = []
-
-    for tile in tiles.values():
-        if tile != None:
-            if tile.color == 'White':
-                white_pieces.append(tile)
-            else:
-                black_pieces.append(tile)
-
-    if turn == 'White':
-        friendly_pieces = white_pieces
-        enemy_pieces = black_pieces
-    else:
-        friendly_pieces = black_pieces
-        enemy_pieces = white_pieces
-
-    del black_pieces
-    del white_pieces
 
     friendly_pieces_bb = np.uint64(0)
     friendly_pieces_bb_no_king = np.uint64(0)
@@ -171,6 +153,7 @@ def generate_legal_moves(tiles, turn, lookup_tables):
 
     for piece in friendly_pieces:
         piece.update_bb()
+        print(piece.tile)
         friendly_pieces_bb = friendly_pieces_bb | piece.bb
 
         if piece.type != 'King':
@@ -209,7 +192,7 @@ def generate_legal_moves(tiles, turn, lookup_tables):
     # Also creates bitboard of all pieces putting the king in check
     attackers = np.uint64(0)
     for type in ('King', 'Queen', 'Bishop', 'Knight', 'Rook', 'Pawn'):
-        attack = attack_moves(friendly_king, occupied_tiles, lookup_tables, type=type)
+        attack = attack_moves(friendly_king, occupied_tiles, type=type)
         attackers = attackers | (attack & enemy_pieces_types_bb[type])
 
     # Counts how many pieces are putting the king in check
@@ -244,16 +227,16 @@ def generate_legal_moves(tiles, turn, lookup_tables):
     # Finds all pinned pieces
     pinned_pieces = []
 
-    bb = straight_moves(friendly_king, occupied_tiles, lookup_tables)
+    bb = straight_moves(friendly_king, occupied_tiles)
     king_vertical = bb & files[friendly_king.tile[0]]
     king_horizontal = bb & ranks[friendly_king.tile[1]]
 
-    bb = diagonal_moves(friendly_king, occupied_tiles, lookup_tables)
+    bb = diagonal_moves(friendly_king, occupied_tiles)
     king_diag = bb & diag_mask[friendly_king.tile[0] + friendly_king.tile[1]]
     king_anti_diag = bb & anti_diag_mask[friendly_king.tile[0] - friendly_king.tile[1]]
 
     for piece in enemy_sliders['Straight']:
-        bb = straight_moves(piece, occupied_tiles, lookup_tables)
+        bb = straight_moves(piece, occupied_tiles)
         enemy_vertical = bb & files[piece.tile[0]]
         enemy_horizontal = bb & files[piece.tile[1]]
 
@@ -268,7 +251,7 @@ def generate_legal_moves(tiles, turn, lookup_tables):
             pinned_pieces.append((piece, tiles[find_tile(bb)]))
 
     for piece in enemy_sliders['Diagonal']:
-        bb = diagonal_moves(piece, occupied_tiles, lookup_tables)
+        bb = diagonal_moves(piece, occupied_tiles)
         enemy_diag = bb & diag_mask[piece.tile[0] + piece.tile[1]]
         enemy_anti_diag = bb & files[piece.tile[1]]
 
@@ -287,7 +270,7 @@ def generate_legal_moves(tiles, turn, lookup_tables):
 
     # Uses the now gathered information to find all the pieces legal moves
     for piece in friendly_pieces:
-        moves = attack_moves(piece, occupied_tiles, lookup_tables)
+        moves = attack_moves(piece, occupied_tiles)
 
         if piece.type == 'King':
             moves = moves & (~king_danger_tiles)
@@ -311,7 +294,7 @@ def generate_legal_moves(tiles, turn, lookup_tables):
 
         elif piece.type == 'Pawn':
             moves = moves & enemy_pieces_bb
-            mask = straight_moves(piece, occupied_tiles, lookup_tables)
+            mask = straight_moves(piece, occupied_tiles)
             moves = moves | (
                         mask & lookup_tables[piece.color + '_Pawn_Moves'][piece.bb_pos_index()] & (~occupied_tiles))
             moves = moves & (~friendly_pieces_bb) & check_mask & piece.pinned_mask

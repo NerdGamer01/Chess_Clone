@@ -15,3 +15,8 @@ files = np.flip(np.array([np.uint64(0x0101010101010101) << np.uint8(i) for i in 
 # Bitboards with the diagonal and anti-diagonal lines filled
 anti_diagonal = np.uint64(0x8040201008040201)
 diagonal = np.uint64(0x0102040810204080)
+
+# Bitboard with first bit being one and the rest being zero
+bb_first = np.uint64(9223372036854775808)
+
+bb_tiles = np.array([bb_first >> np.uint8(i) for i in range(64)])

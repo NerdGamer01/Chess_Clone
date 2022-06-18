@@ -1,5 +1,8 @@
 from constants import Tile_Size, Origin, Tile_Color, Window_Size, Boarder_Width
-from move_gen import generate_legal_moves
+from move_gen2 import generate_legal_moves
+from bitboard_functions import index2tile
+from board import Board
+from AI import AI
 import numpy as np
 import pygame
 
@@ -54,16 +57,19 @@ selected_indicator.fill((255, 255, 0))
 selected_indicator.set_alpha(100)
 
 
-class Board:
-    def __init__(self, lookup_tables, AI, save_file=None):
+class Game:
+    def __init__(self, lookup_tables, ai, save_file=None):
         self.turn = 'White'  # Which turn it is
         self.selected_piece = None  # The piece currently selected by the player
-        self.AI = AI  # Is this a round with or without ai
+        self.AI_Check = ai  # Is this a round with or without ai
         self.moving_piece = False  # Is a piece currently moving
         self.tiles = {}  # A dictionary containing all the pieces with the tile coordinate as the key
         self.sprites = pygame.sprite.Group()
         self.lookup_tables = lookup_tables
         self.castling = False
+
+        if ai:
+            self.AI = AI()
 
         for x in range(8):
             for y in range(8):
@@ -89,27 +95,41 @@ class Board:
                 self.sprites.add(self.tiles[(x, 7)])
                 self.sprites.add(self.tiles[(x, 6)])
 
-        generate_legal_moves(self.tiles, self.turn, lookup_tables)
+        self.generate_moves()
 
     def update(self, clicked, dt):
-        if clicked and not self.moving_piece:
-            self.process_player_click()
-
-        elif self.moving_piece:
+        if self.moving_piece:
             self.update_move(dt)
+        else:
+            if self.AI_Check and self.turn == 'Black':
+                if not self.AI.is_alive():
+
+                    self.moving_piece = True
+                    if self.AI.move[2] == 'Standard':
+                        self.target = index2tile(self.AI.move[1])
+                        self.target = (self.target[0] * Tile_Size + Origin[0], self.target[1] * Tile_Size + Origin[1])
+                        self.selected_piece = self.tiles[index2tile(self.AI.move[0])]
+                        self.selected_piece.castle = False
+
+                    self.AI = AI()
+
+            elif clicked:
+                self.process_player_click()
 
     def process_player_click(self):
         # Process the player clicking on the board and select/deselects pieces
         # Also initiates a move if applicable
-        if not self.AI or (self.AI and self.turn == 'White'):
+        if not self.AI_Check or (self.AI_Check and self.turn == 'White'):
             pos = pygame.mouse.get_pos()
             pos = ((pos[0] - Origin[0]) // Tile_Size, (pos[1] - Origin[1]) // Tile_Size)
 
             if pos[0] < 0 or pos[0] > 7 or pos[1] < 0 or pos[1] > 7:
                 return
 
-            if self.selected_piece != None and self.selected_piece.type == 'King' and pos in self.selected_piece.legal_moves and \
-                    self.tiles[pos] != None and self.tiles[pos].color == self.turn:
+            if self.selected_piece != None and self.selected_piece.type == 'King' and \
+                    pos in self.selected_piece.legal_moves and self.tiles[pos] != None and \
+                    self.tiles[pos].color == self.turn:
+
                 self.moving_piece = True
                 self.castling = True
                 self.castling_rook = self.tiles[pos]
@@ -166,15 +186,32 @@ class Board:
 
         if self.turn == 'White':
             self.turn = 'Black'
+
+            if self.AI_Check:
+                self.AI.board = Board(self.tiles, self.turn)
+                self.AI.start()
+            else:
+                self.generate_moves()
+
         else:
             self.turn = 'White'
-
-        generate_legal_moves(self.tiles, self.turn, self.lookup_tables)
+            self.generate_moves()
 
     def update_tiles(self, piece, target):
         self.tiles[target] = piece
         self.tiles[piece.tile] = None
         piece.tile = target
+
+    def generate_moves(self):
+        moves = generate_legal_moves(Board(self.tiles, self.turn))
+
+        for piece in self.tiles.values():
+            if piece != None:
+                piece.legal_moves = []
+
+        for m in moves:
+            if m[2] == 'Standard':
+                self.tiles[index2tile(m[0])].legal_moves.append(index2tile(m[1]))
 
     def draw(self, screen):
         # Draws Background
@@ -205,7 +242,7 @@ class Piece(pygame.sprite.Sprite):
         self.type = type
         self.color = color
         self.tile = tile
-        self.castle = True  # Is true if the piece hasent moved yet as only  if the pieces havent move can they castle
+        self.castle = True  # Is true if the piece hasent moved yet as only if the pieces havent move can they castle
         self.legal_moves = [(3, 3), (0, 1), (6, 5), (4, 4), (1, 3)]
 
         # Creates piece image from sprite sheet
@@ -245,21 +282,3 @@ class Piece(pygame.sprite.Sprite):
 
         else:
             return False
-
-    def update_bb(self):
-        bb = ['0'] * 64
-        bb[self.bb_pos_index()] = '1'
-        bb = ''.join(bb)
-        self.bb = np.uint64(int(bb, 2))
-        self.pinned_mask = ~np.uint64(0)
-
-    # Return index for pieces position on a bitboard
-    def bb_pos_index(self):
-        return self.tile[1] * 8 + self.tile[0]
-
-    def update_legal_moves(self, bb):
-        bb = '{0:064b}'.format(bb)
-        self.legal_moves = []
-        for i in range(64):
-            if bb[i] == '1':
-                self.legal_moves.append((i - (8 * (i // 8)), i // 8))
