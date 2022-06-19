@@ -14,7 +14,7 @@ clock = pygame.time.Clock()
 lookup_tables = 0
 
 # Variable which determines which window is shown
-# 0: Game 1: Main Menu 2: Pause 3: Save Files 4: Load Files 5: Are you sure
+# 0: Game 1: Main Menu 2: Pause 3: Save Files 4: Load Files 5: Are you sure 6: Choose Opponent
 window = 1
 
 # Creates the menus
@@ -22,12 +22,13 @@ Main_Menu = Menu(['New Game', 'Load Game', 'Quit Game'], center=False, main_menu
 Pause_Menu = Menu(['Resume Game', 'Save Game', 'Load Game', 'Main Menu', 'Quit Game'])
 Are_You_Sure_Menu = Menu(['Yes', 'No'], center=False, text=['Are you sure you want to quit the game?',
                                                             'All unsaved progress will be lost.'])
-Game_Type_Menu = Menu(['Player','AI', 'Back'], center=False, text=['Choose Opponent'])
+Choose_Opponent_Menu = Menu(['Player', 'Computer', 'Back'], center=False, text=['Choose Opponent'])
 Save_File_Menu = File_Menu('save')
 Load_File_Menu = File_Menu('load')
 
 # Main game loop
 running = True
+game_running = False
 while running:
 
     dt = clock.tick(30)
@@ -119,15 +120,15 @@ while running:
             window = previous_window
 
     elif window == 6:
-        Game_Type_Menu.draw(screen)
-        selected_button = Game_Type_Menu.check_button_press(clicked)
+        Choose_Opponent_Menu.draw(screen)
+        selected_button = Choose_Opponent_Menu.check_button_press(clicked)
 
         if selected_button == 'Player':
             game = Game(lookup_tables, False)
             game_running = True
             window = 0
 
-        elif selected_button == 'AI':
+        elif selected_button == 'Computer':
             game = Game(lookup_tables, True)
             game_running = True
             window = 0

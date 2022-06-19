@@ -1,9 +1,8 @@
-from bitboard_functions import shift_bb
-from constants import anti_diagonal, files, ranks, diagonal
+from bitboard_functions import shift_bb, index2tile, bit_counter, extract_indices, bitscan
+from constants import anti_diagonal, files, ranks, diagonal, bb_tiles
 from lookup_tables import lookup_tables
+from copy import copy
 import numpy as np
-
-
 
 # Creates diagonal masks, use the index (x+y) to find mask corresponding to a tile
 diag = diagonal
@@ -30,276 +29,218 @@ for i in range(7):
     anti_diag_mask[14 - i] = anti_diag
 
 
-# Generates moves for sliding pieces in vertical and horizontal direction
-# Movements for sliding pieces are found using kindergarten procedure
-def straight_moves(piece, occupied_tiles):
-    file_moves = occupied_tiles & files[piece.tile[0]]
+def diagonal_moves(i, occupied_bb):
+    tile = index2tile(i)
 
-    for i in range(piece.tile[0]):
-        file_moves = shift_bb(file_moves, 'w')
-
-    file_moves = (file_moves * diagonal) >> np.uint8(56)
-    file_moves = lookup_tables['Bottom_Rank_Moves'][piece.tile[1]][file_moves]
-    file_moves = ((file_moves * diagonal) >> np.uint8(7)) & files[0]
-
-    for i in range(piece.tile[0]):
-        file_moves = shift_bb(file_moves, 'e')
-
-    rank_moves = occupied_tiles & ranks[piece.tile[1]]
-
-    rank_moves = rank_moves >> np.uint8(8 * (7 - piece.tile[1]))
-
-    rank_moves = lookup_tables['Bottom_Rank_Moves'][piece.tile[0]][rank_moves]
-
-    rank_moves = rank_moves << np.uint8(8 * (7 - piece.tile[1]))
-
-    return rank_moves | file_moves
-
-
-# Generates diagonal movements
-def diagonal_moves(piece, occupied_tiles):
-    diag_moves = occupied_tiles & diag_mask[piece.tile[0] + piece.tile[1]]
+    diag_moves = occupied_bb & diag_mask[tile[0] + tile[1]]
     diag_moves = (diag_moves * files[7]) >> np.uint8(56)
-    diag_moves = lookup_tables['Bottom_Rank_Moves'][piece.tile[0]][diag_moves]
-    diag_moves = (diag_moves * files[7]) & diag_mask[piece.tile[0] + piece.tile[1]]
+    diag_moves = lookup_tables['Bottom_Rank_Moves'][tile[0]][diag_moves]
+    diag_moves = (diag_moves * files[7]) & diag_mask[tile[0] + tile[1]]
 
-    anti_diag_moves = occupied_tiles & anti_diag_mask[piece.tile[0] - piece.tile[1]]
+    anti_diag_moves = occupied_bb & anti_diag_mask[tile[0] - tile[1]]
     anti_diag_moves = (anti_diag_moves * files[7]) >> np.uint8(56)
-    anti_diag_moves = lookup_tables['Bottom_Rank_Moves'][piece.tile[0]][anti_diag_moves]
-    anti_diag_moves = (anti_diag_moves * files[7]) & anti_diag_mask[piece.tile[0] - piece.tile[1]]
+    anti_diag_moves = lookup_tables['Bottom_Rank_Moves'][tile[0]][anti_diag_moves]
+    anti_diag_moves = (anti_diag_moves * files[7]) & anti_diag_mask[tile[0] - tile[1]]
 
     return diag_moves | anti_diag_moves
 
+def file_moves(i, occupied_bb):
+    tile = index2tile(i)
+
+    k1 = np.uint64(0xaa00aa00aa00aa00)
+    k2 = np.uint64(0xcccc0000cccc0000)
+    k3 = np.uint64(0xf0f0f0f00f0f0f0f)
+
+    moves = files[0] & (occupied_bb << np.uint8(tile[0]))
+    moves = (diagonal * moves) >> np.uint8(56)
+    moves = lookup_tables['Bottom_Rank_Moves'][tile[1]][moves]
+
+    # FLips it around the diagonal
+    t = moves ^ (moves << np.uint8(36))
+    moves ^= k3 & (t ^ (moves >> np.uint8(36)))
+    t = k2 & (moves ^ (moves << np.uint8(18)))
+    moves ^= t ^ (t >> np.uint8(18))
+    t = k1 & (moves ^ (moves << np.uint8(9)))
+    moves ^= t ^ (t >> np.uint8(9))
+
+    # FLips around vertical and moves it back to the correct file
+    moves = (moves << np.uint8(56)) | ((moves << np.uint8(40)) & ranks[1]) \
+                 | ((moves << np.uint8(24)) & ranks[2]) | ((moves << np.uint8(8)) & ranks[3]) \
+                 | ((moves >> np.uint8(8)) & ranks[4]) | ((moves >> np.uint8(24)) & ranks[5]) \
+                 | ((moves >> np.uint8(40)) & ranks[6]) | (moves >> np.uint8(56))
+
+    moves = moves >> np.uint8(tile[0])
+
+    return moves
+
+def rank_moves(i, occupied_bb):
+    tile = index2tile(i)
+
+    moves = occupied_bb & ranks[tile[1]]
+    moves = moves >> np.uint8(8 * (7 - tile[1]))
+    moves = lookup_tables['Bottom_Rank_Moves'][tile[0]][moves]
+    moves = moves << np.uint8(8 * (7 - tile[1]))
+
+    return moves
 
 # Finds tiles a piece can attack
-def attack_moves(piece, occupied_tiles, type=0):
-    if type == 0:
-        type = piece.type
-
+def attack_moves(i, type, color, occupied_bb):
     if type == 'Pawn':
-        bb = lookup_tables[piece.color + '_Pawn_Attacks'][piece.bb_pos_index()]
+        bb = lookup_tables[color + '_Pawn_Attacks'][i]
 
     elif type == 'King' or type == 'Knight':
-        bb = lookup_tables[type + '_Moves'][piece.bb_pos_index()]
+        bb = lookup_tables[type + '_Moves'][i]
 
     else:
         bb = np.uint64(0)
-        if type == 'Rook' or type == 'Queen':
-            bb = bb | straight_moves(piece, occupied_tiles)
+        if type != 'Bishop':
+            bb = bb | file_moves(i, occupied_bb) | rank_moves(i, occupied_bb)
 
-        if type == 'Bishop' or type == 'Queen':
-            bb = bb | diagonal_moves(piece, occupied_tiles)
+        if type != 'Rook':
+            bb = bb | diagonal_moves(i, occupied_bb)
 
     return bb
 
-
-# Finds the tile on which a bit is
-def find_tile(bb):
-    bb = '{0:064b}'.format(bb)
-    for i in range(64):
-        if bb[i] == '1':
-            return (i - (8 * (i // 8)), i // 8)
-
-
-# Creates a bitboard with all bits between two tiles set to one
-def in_between_tiles(tile1, tile2):
-    difference = (tile1[0] - tile2[0], tile1[1] - tile2[1])
-    direction = ''
-
-    if difference[1] > 0:
-        direction += 'n'
-    elif difference[1] < 0:
-        direction += 's'
-
-    if difference[0] < 0:
-        direction += 'e'
-    elif difference[0] > 0:
-        direction += 'w'
-
-    if difference[0] >= difference[1]:
-        difference = np.abs(difference[0]) - 1
-    else:
-        difference = np.abs(difference[1]) - 1
-
-    bb = ['0'] * 64
-    bb[tile1[1] * 8 + tile1[0]] = '1'
-    bb = ''.join(bb)
-    bb = np.uint64(int(bb, 2))
-    result = np.uint64(0)
-
-    for x in range(difference):
-        bb = shift_bb(bb, direction)
-        result = result | bb
-
-    return result
-
-
 # The legal moves are generated via the procedure described here:
 # https://peterellisjones.com/posts/generating-legal-chess-moves-efficiently/
-def generate_legal_moves(friendly_pieces, enemy_pieces):
-    # The first section extracts the pieces from the tiles libary and sorts well into two lists
-    # One for the pieces belonging to whomever turn it is (friendly pieces) and the others (enemy pieces)
-    # It also creates all necessary bitboards showing occupied tiles
+def generate_legal_moves(board):
+    moves = []
 
-    friendly_pieces_bb = np.uint64(0)
-    friendly_pieces_bb_no_king = np.uint64(0)
-    friendly_rooks = []
-    enemy_pieces_bb = np.uint64(0)
-    enemy_pieces_types_bb = {}
-    enemy_sliders = {'Straight': [], 'Diagonal': []}
+    # Extracts necessary information
+    if board.turn == 'White':
+        enemy_color = 'Black'
 
-    for type in ('King', 'Queen', 'Bishop', 'Knight', 'Rook', 'Pawn'):
-        enemy_pieces_types_bb[type] = np.uint64(0)
+    else:
+        enemy_color = 'White'
 
-    for piece in friendly_pieces:
-        piece.update_bb()
-        print(piece.tile)
-        friendly_pieces_bb = friendly_pieces_bb | piece.bb
-
-        if piece.type != 'King':
-            friendly_pieces_bb_no_king = friendly_pieces_bb_no_king | piece.bb
-
-            if piece.type == 'Rook':
-                friendly_rooks.append(piece)
-
-        else:
-            friendly_king = piece
-
-    for piece in enemy_pieces:
-        piece.update_bb()
-        enemy_pieces_bb = enemy_pieces_bb | piece.bb
-        enemy_pieces_types_bb[piece.type] = enemy_pieces_types_bb[piece.type] | piece.bb
-
-        if piece.type == 'Rook' or piece.type == 'Queen':
-            enemy_sliders['Straight'].append(piece)
-
-        if piece.type == 'Queen' or piece.type == 'Bishop':
-            enemy_sliders['Diagonal'].append(piece)
-
-    occupied_tiles = enemy_pieces_bb | friendly_pieces_bb
-    occupied_tiles_no_king = enemy_pieces_bb | friendly_pieces_bb_no_king
+    friendly_index = copy(board.indices[board.turn])
+    friendly_bb= board.sides_bb[board.turn]
+    enemy_index = board.indices[enemy_color]
+    enemy_bb = board.sides_bb[enemy_color]
+    friendly_king_index = bitscan(board.types_bb[board.turn]['King'])
+    enemy_types_bb = board.types_bb[enemy_color]
 
     # Creates bitboard of all tiles attacked by the enemy ignoring the friendly king
     # These are then the tiles the king can't move to or it would be in check
-    king_danger_tiles = np.uint64(0)
-    attacked_tiles = np.uint64(0)
+    occupied_bb = friendly_bb | enemy_bb
+    occupied_no_king_bb = occupied_bb & ~bb_tiles[friendly_king_index]
+    king_danger_bb = np.uint64(0)
 
-    for piece in enemy_pieces:
-        king_danger_tiles = king_danger_tiles | attack_moves(piece, occupied_tiles_no_king, lookup_tables)
-        attacked_tiles = attacked_tiles | attack_moves(piece, occupied_tiles, lookup_tables)
+    for i in enemy_index:
+        king_danger_bb = king_danger_bb | attack_moves(i, enemy_index[i], enemy_color, occupied_no_king_bb)
 
     # Next it checks if the player king is in check as if it is the moves the player can make is very limited
     # Also creates bitboard of all pieces putting the king in check
-    attackers = np.uint64(0)
+    checkers = np.uint64(0)
     for type in ('King', 'Queen', 'Bishop', 'Knight', 'Rook', 'Pawn'):
-        attack = attack_moves(friendly_king, occupied_tiles, type=type)
-        attackers = attackers | (attack & enemy_pieces_types_bb[type])
-
-    # Counts how many pieces are putting the king in check
-    num_checks = 0
-    for i in '{0:064b}'.format(attackers):
-        if i == '1':
-            num_checks += 1
+        attack = attack_moves(friendly_king_index, type, enemy_color, occupied_bb)
+        checkers = checkers | (attack & enemy_types_bb[type])
 
     # If the king is in check by more the one piece only the king can move
-    if num_checks > 1:
-        for piece in friendly_pieces:
-            piece.legal_moves = []
+    num_checkers = bit_counter(checkers)
+    if num_checkers > 1:
+        moves_bb = lookup_tables['King_Moves'][friendly_king_index] & (~king_danger_bb) & (~friendly_bb)
 
-        moves = lookup_tables['King_Moves'][friendly_king.bb_pos_index()]
-        moves = moves & (~king_danger_tiles) & (~friendly_pieces_bb)
-        piece.update_legal_moves(moves)
-        return
+        for i in extract_indices(moves_bb):
+            moves.append((friendly_king_index, i, 'Standard'))
 
-    elif num_checks == 1:
-        check_mask = attackers
-        attacking_sliders = attackers & (
-                    enemy_pieces_types_bb['Queen'] | enemy_pieces_types_bb['Rook'] | enemy_pieces_types_bb['Bishop'])
-        attacking_sliders = '{0:064b}'.format(attacking_sliders)
+        return moves
 
-        for i in range(64):
-            if attacking_sliders[i] == '1':
-                check_mask = check_mask | in_between_tiles((i - ((i // 8) * 8), i // 8), friendly_king.tile)
+    # Being in check limits the number of moves one can make to caputing pieces that put the king in check
+    # or blocking sliding pieces which put the king in check
+    elif num_checkers == 1:
+        i = bitscan(checkers)
+        if enemy_index[i] in ('Queen', 'Rook', 'Bishop'):
+            push_mask = attack_moves(i, enemy_index[i], enemy_color, occupied_bb)
+        else:
+            push_mask = np.uint64(0)
 
     else:
-        check_mask = ~np.uint64(0)
+        push_mask = ~np.uint64(0)
+        checkers = ~np.uint64(0)
 
     # Finds all pinned pieces
-    pinned_pieces = []
+    pinned_pieces = np.uint64(0)
+    sliders_from_king = attack_moves(friendly_king_index, 'Queen', board.turn, occupied_bb)
+    king_tile = index2tile(friendly_king_index)
 
-    bb = straight_moves(friendly_king, occupied_tiles)
-    king_vertical = bb & files[friendly_king.tile[0]]
-    king_horizontal = bb & ranks[friendly_king.tile[1]]
+    for type in ('Queen', 'Rook', 'Bishop'):
+        for i in extract_indices(enemy_types_bb[type]):
+            attack = attack_moves(i, type, enemy_color, occupied_bb)
+            attacker_tile = index2tile(i)
 
-    bb = diagonal_moves(friendly_king, occupied_tiles)
-    king_diag = bb & diag_mask[friendly_king.tile[0] + friendly_king.tile[1]]
-    king_anti_diag = bb & anti_diag_mask[friendly_king.tile[0] - friendly_king.tile[1]]
+            file_pinned = files[attacker_tile[0]] & files[king_tile[0]] & friendly_bb & sliders_from_king & attack
+            ranks_pinned = ranks[attacker_tile[1]] & ranks[king_tile[1]] & friendly_bb & sliders_from_king & attack
+            diag_pinned = diag_mask[attacker_tile[0] + attacker_tile[1]] & diag_mask[king_tile[0] + king_tile[1]] \
+                           & attack & friendly_bb & sliders_from_king
+            anti_diag_pinned = anti_diag_mask[attacker_tile[0] - attacker_tile[1]] \
+                               & anti_diag_mask[king_tile[0] - king_tile[1]] & attack & friendly_bb & sliders_from_king
 
-    for piece in enemy_sliders['Straight']:
-        bb = straight_moves(piece, occupied_tiles)
-        enemy_vertical = bb & files[piece.tile[0]]
-        enemy_horizontal = bb & files[piece.tile[1]]
+            pinned_pieces = pinned_pieces | file_pinned | ranks_pinned | diag_pinned | anti_diag_pinned
 
-        bb = enemy_vertical & king_vertical & friendly_pieces_bb
+    # Uses the now gathered information to find all the legal moves
+    for i in friendly_index:
+        type = friendly_index[i]
+        m = attack_moves(i, type, board.turn, occupied_bb)
 
-        if bb != np.uint64(0):
-            pinned_pieces.append((piece, tiles[find_tile(bb)]))
+        if type == 'Pawn':
+            tile = index2tile(i)
+            m = m & enemy_bb
+            if tile[1] == 1 or tile[1] == 6:
+                m = m | (lookup_tables[board.turn + '_Pawn_Moves'][i] & file_moves(i, occupied_bb) & ~enemy_bb)
+            else:
+                m = m | (lookup_tables[board.turn + '_Pawn_Moves'][i] & ~enemy_bb)
 
-        bb = enemy_horizontal & king_horizontal & friendly_pieces_bb
+            # Finds possible en passant moves
+            en_passant_targets = board.en_passant_targets & checkers & \
+                                 enemy_bb & (shift_bb(bb_tiles[i],'e') | shift_bb(bb_tiles[i],'w'))
 
-        if bb != np.uint64(0):
-            pinned_pieces.append((piece, tiles[find_tile(bb)]))
+            if en_passant_targets != np.uint64(0):
 
-    for piece in enemy_sliders['Diagonal']:
-        bb = diagonal_moves(piece, occupied_tiles)
-        enemy_diag = bb & diag_mask[piece.tile[0] + piece.tile[1]]
-        enemy_anti_diag = bb & files[piece.tile[1]]
+                if tile[1] == 3:
+                    d = ('n','s')
+                else:
+                    d = ('s','n')
+                en_passant_targets = shift_bb(en_passant_targets, d[0]) & push_mask & ~friendly_bb
+                en_passant_targets = shift_bb(en_passant_targets, d[1])
 
-        bb = enemy_diag & king_diag & friendly_pieces_bb
+                for j in extract_indices(en_passant_targets):
+                    # checks if the move puts the king in check
+                    check = False
+                    if tile[1] == index2tile(friendly_king_index)[1] and enemy_bb & ranks[tile[1]] != np.uint64(0):
+                        occupied_en_passant_bb = occupied_bb & ~bb_tiles[i] & ~bb_tiles[j]
+                        for k in extract_indices(enemy_bb & ranks[tile[1]]):
+                            if bb_tiles[friendly_king_index] & rank_moves(k, occupied_en_passant_bb) != np.uint64(0) \
+                                    and enemy_index[k] in ('Queen', 'Rook'):
+                                check = True
 
-        if bb != np.uint64(0):
-            pinned_pieces.append((piece, tiles[find_tile(bb)]))
+                    if not check:
+                        moves.append((i, j, 'en passant'))
 
-        bb = enemy_anti_diag & king_anti_diag & friendly_pieces_bb
-
-        if bb != np.uint64(0):
-            pinned_pieces.append((piece, tiles[find_tile(bb)]))
-
-    for pieces in pinned_pieces:
-        pieces[1].pinned_mask = in_between_tiles(pieces[0].tile, friendly_king.tile) | pieces[0].bb
-
-    # Uses the now gathered information to find all the pieces legal moves
-    for piece in friendly_pieces:
-        moves = attack_moves(piece, occupied_tiles)
-
-        if piece.type == 'King':
-            moves = moves & (~king_danger_tiles)
-
-            moves = moves & (~friendly_pieces_bb)
-
-            # Implements castle moves if applicable
-            if piece.castle:
-                for rook in friendly_rooks:
-                    if rook.castle:
-                        if rook.tile[0] == 0:
-                            gap = (files[1] | files[2] | files[3])
-
-                        else:
-                            gap = files[5] | files[6]
-
-                        bb = ((occupied_tiles & gap) | (gap & attacked_tiles & ~files[1])) & ranks[piece.tile[1]]
-                        if bb == np.uint64(0):
-                            moves = moves | rook.bb
-
-
-        elif piece.type == 'Pawn':
-            moves = moves & enemy_pieces_bb
-            mask = straight_moves(piece, occupied_tiles)
-            moves = moves | (
-                        mask & lookup_tables[piece.color + '_Pawn_Moves'][piece.bb_pos_index()] & (~occupied_tiles))
-            moves = moves & (~friendly_pieces_bb) & check_mask & piece.pinned_mask
+        if type == 'King':
+            m = m & ~king_danger_bb
 
         else:
-            moves = moves & (~friendly_pieces_bb) & check_mask & piece.pinned_mask
+            m = m & (push_mask | checkers)
 
-        piece.update_legal_moves(moves)
+        m = m & ~friendly_bb
+
+        # Finds moves for pinned pieces
+        if ~bb_tiles[i] & pinned_pieces != pinned_pieces:
+            tile = index2tile(i)
+            if ranks[tile[1]] & bb_tiles[friendly_king_index] == bb_tiles[friendly_king_index]:
+                m = m & ranks[tile[1]]
+
+            elif files[tile[0]] & bb_tiles[friendly_king_index] == bb_tiles[friendly_king_index]:
+                m = m & files[tile[0]]
+
+            elif diag_mask[tile[0] + tile[1]] & bb_tiles[friendly_king_index] == bb_tiles[friendly_king_index]:
+                m = m & diag_mask[tile[0] + tile[1]]
+
+            elif anti_diag_mask[tile[0] - tile[1]] & bb_tiles[friendly_king_index] == bb_tiles[friendly_king_index]:
+                m = m & diag_mask[tile[0] - tile[1]]
+
+        for j in extract_indices(m):
+            moves.append((i, j, 'Standard'))
+
+    return moves
